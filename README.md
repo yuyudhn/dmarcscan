@@ -1,0 +1,2 @@
+# DMARCscan
+Bulk DMARC Scanner
