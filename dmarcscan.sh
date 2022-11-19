@@ -1,7 +1,8 @@
 #!/bin/bash
 echo -e "
-DMARCscan - Bulk DMARC Scanner
-Codename : Asuka\n"
+dmarcscan - Bulk DMARC Scanner
+Codename : Asuka
+Version : 0.2#dev\n"
 
 if ! command -v dig &> /dev/null
         then
@@ -9,9 +10,10 @@ if ! command -v dig &> /dev/null
         exit 1
 fi
 # Color definition
-reset="\033[0m"			# Normal Colour
-red="\033[0;31m" 		# Error / Issues
-green="\033[0;32m"		# Successful
+reset="\033[0m"					# Normal Colour
+red="\033[0;31m"				# Error / Issues
+green="\033[0;32m"				# Successful
+padding="-------------------------------" # Padding
 #Function
 process=5
 showHelp()
@@ -27,7 +29,7 @@ showHelp()
 }
 
 
-if [ -z "$1" ] || [[ ! $@ =~ ^\-.+ ]]; then
+if [ -z "$1" ] || [[ ! $1 =~ ^\-.+ ]]; then
     showHelp
     exit 0
 fi
@@ -57,7 +59,7 @@ done
 shift "$((OPTIND-1))"
 
 # Options validation
-if [[ ! -z "$domainlists" && ! -z "$singledomain" ]]; then
+if [[ -n "$domainlists" && -n "$singledomain" ]]; then
     echo "Option -l and -d cannot be used together." >&2
     exit 1
 fi
@@ -71,30 +73,27 @@ domainListCheck(){
 if [[ -z "$singledomain" ]]; then
 	domainListCheck
 fi
-bulkDMARC() {
-	if [[ $(dig +short _dmarc.$hostlists TXT) =~ 'DMARC' ]]; then
-		printf "$hostlists - ${green}DMARC Exist${reset}\n"
+
+if [[ -z "$domainlists" ]]; then
+	hostlists="$singledomain"
+fi
+dmarcscan() {
+	if [[ $(dig +short _dmarc."$hostlists" TXT) =~ 'DMARC' ]]; then
+		printf "%b%b %b\n" "$hostlists " "${padding:${#hostlists}}" "${green}DMARC EXIST${reset}"
 	else
-		printf "$hostlists - ${red}DMARC not Exist${reset}\n"
+		printf "%b%b %b\n" "$hostlists " "${padding:${#hostlists}}" "${red}DMARC NOT EXIST${reset}"
 	fi
 }
-singleDMARC() {
-	if [[ $(dig +short _dmarc.$singledomain TXT) =~ 'DMARC' ]]; then
-		printf "$singledomain - ${green}DMARC Exist${reset}\n"
-	else
-		printf "$singledomain - ${red}DMARC not Exist${reset}\n"
-	fi
-}
+
 # Do the jobs
-if [[ ! -z "$singledomain" ]]; then
-    singleDMARC
-    else
-    while read hostlists; do
-    bulkDMARC &
-    background=( $(jobs -p) )
-    	if (( ${#background[@]} == process )); then
-        	wait -n
-    	fi
+if [[ -n "$singledomain" ]]; then
+    dmarcscan
+    elif [[ -n "$domainlists" ]]; then
+    while IFS= read -r hostlists; do
+    dmarcscan &
+    if test "$(jobs | wc -l)" -ge "$process"; then
+      wait -n
+    fi
    done < "$domainlists"
 wait
 fi
